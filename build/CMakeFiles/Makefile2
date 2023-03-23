@@ -60,7 +60,7 @@ all: 2022_competition/enph353/enph353/all
 all: 2022_competition/enph353/enph353_npcs/all
 all: 2022_competition/enph353/enph353_utils/all
 all: 2022_competition/adeept_awr_ros_driver/all
-all: better_controll/all
+all: controller_pkg/all
 all: 2022_competition/adeept_awr/adeept_awr_gazebo/all
 all: 2022_competition/enph353/enph353_gazebo/all
 
@@ -74,7 +74,7 @@ preinstall: 2022_competition/enph353/enph353/preinstall
 preinstall: 2022_competition/enph353/enph353_npcs/preinstall
 preinstall: 2022_competition/enph353/enph353_utils/preinstall
 preinstall: 2022_competition/adeept_awr_ros_driver/preinstall
-preinstall: better_controll/preinstall
+preinstall: controller_pkg/preinstall
 preinstall: 2022_competition/adeept_awr/adeept_awr_gazebo/preinstall
 preinstall: 2022_competition/enph353/enph353_gazebo/preinstall
 
@@ -93,7 +93,7 @@ clean: 2022_competition/enph353/enph353/clean
 clean: 2022_competition/enph353/enph353_npcs/clean
 clean: 2022_competition/enph353/enph353_utils/clean
 clean: 2022_competition/adeept_awr_ros_driver/clean
-clean: better_controll/clean
+clean: controller_pkg/clean
 clean: 2022_competition/adeept_awr/adeept_awr_gazebo/clean
 clean: 2022_competition/enph353/enph353_gazebo/clean
 
@@ -345,22 +345,22 @@ clean: 2022_competition/enph353/enph353_gazebo/clean
 .PHONY : 2022_competition/enph353/enph353_utils/clean
 
 #=============================================================================
-# Directory level rules for directory better_controll
+# Directory level rules for directory controller_pkg
 
 # Recursive "all" directory target.
-better_controll/all:
+controller_pkg/all:
 
-.PHONY : better_controll/all
+.PHONY : controller_pkg/all
 
 # Recursive "preinstall" directory target.
-better_controll/preinstall:
+controller_pkg/preinstall:
 
-.PHONY : better_controll/preinstall
+.PHONY : controller_pkg/preinstall
 
 # Recursive "clean" directory target.
-better_controll/clean:
+controller_pkg/clean:
 
-.PHONY : better_controll/clean
+.PHONY : controller_pkg/clean
 
 #=============================================================================
 # Directory level rules for directory gtest

@@ -61,7 +61,6 @@ all: 2022_competition/enph353/enph353/all
 all: 2022_competition/enph353/enph353_npcs/all
 all: 2022_competition/enph353/enph353_utils/all
 all: 2022_competition/adeept_awr_ros_driver/all
-all: controller_pkg/all
 all: 2022_competition/adeept_awr/adeept_awr_gazebo/all
 all: 2022_competition/enph353/enph353_gazebo/all
 
@@ -76,7 +75,6 @@ preinstall: 2022_competition/enph353/enph353/preinstall
 preinstall: 2022_competition/enph353/enph353_npcs/preinstall
 preinstall: 2022_competition/enph353/enph353_utils/preinstall
 preinstall: 2022_competition/adeept_awr_ros_driver/preinstall
-preinstall: controller_pkg/preinstall
 preinstall: 2022_competition/adeept_awr/adeept_awr_gazebo/preinstall
 preinstall: 2022_competition/enph353/enph353_gazebo/preinstall
 
@@ -96,7 +94,6 @@ clean: 2022_competition/enph353/enph353/clean
 clean: 2022_competition/enph353/enph353_npcs/clean
 clean: 2022_competition/enph353/enph353_utils/clean
 clean: 2022_competition/adeept_awr_ros_driver/clean
-clean: controller_pkg/clean
 clean: 2022_competition/adeept_awr/adeept_awr_gazebo/clean
 clean: 2022_competition/enph353/enph353_gazebo/clean
 
@@ -364,24 +361,6 @@ con/preinstall:
 con/clean:
 
 .PHONY : con/clean
-
-#=============================================================================
-# Directory level rules for directory controller_pkg
-
-# Recursive "all" directory target.
-controller_pkg/all:
-
-.PHONY : controller_pkg/all
-
-# Recursive "preinstall" directory target.
-controller_pkg/preinstall:
-
-.PHONY : controller_pkg/preinstall
-
-# Recursive "clean" directory target.
-controller_pkg/clean:
-
-.PHONY : controller_pkg/clean
 
 #=============================================================================
 # Directory level rules for directory gtest

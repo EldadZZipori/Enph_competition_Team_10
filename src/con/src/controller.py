@@ -34,11 +34,11 @@ if __name__=="__main__":
                 pub.publish(vel_msg)
             elif key == 'a':
                 vel_msg = Twist()
-                vel_msg.angular.z = 0.7
+                vel_msg.angular.z = 1.2
                 pub.publish(vel_msg)
             elif key == 'd':
                 vel_msg = Twist()
-                vel_msg.angular.z = -0.7
+                vel_msg.angular.z = -1.2
                 pub.publish(vel_msg)
             elif key == '\x03': # Ctrl+C
                 break

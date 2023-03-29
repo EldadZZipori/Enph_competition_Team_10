@@ -121,7 +121,6 @@ class Window(QtWidgets.QMainWindow):
 
     def SLOT_message_received(self, license_string):
         self.log_msg("Message received: {}".format(license_string))
-        print("blabla")
         teamID, teamPswd, plateLocation, plateID = str(license_string).split(',')
         
         # Use to start the timer and register the team name (not for points)

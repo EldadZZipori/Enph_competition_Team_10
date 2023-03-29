@@ -44,10 +44,10 @@ if __name__=="__main__":
                 linear_x -= 0.15
                 vel_msg.linear.x = linear_x
             elif key == 'a':
-                angular_z += 0.2
+                angular_z += 0.15
                 vel_msg.angular.z = angular_z
             elif key == 'd':
-                angular_z -= 0.2
+                angular_z -= 0.15
                 vel_msg.angular.z = angular_z
             elif key == 'e':
                 angular_z = 0

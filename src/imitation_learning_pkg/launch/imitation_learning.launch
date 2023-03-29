@@ -1,0 +1,8 @@
+<launch>
+   <!-- My Package launch file -->
+   <node pkg="imitation_learning_pkg"
+         type="imitation_learning.py"
+         name="imitation_learning" 
+         output="screen">
+   </node>
+</launch>

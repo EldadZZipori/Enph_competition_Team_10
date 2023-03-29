@@ -21,29 +21,39 @@ if __name__=="__main__":
     pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
     rate = rospy.Rate(10) # 10hz
 
+    linear_x = 0
+    angular_z = 0
+    vel_msg = Twist()
+
     try:
         while not rospy.is_shutdown():
             key = getKey()
             if key == 'w':
-                vel_msg = Twist()
-                vel_msg.linear.x = 0.5
-                pub.publish(vel_msg)
+                print(linear_x)
+                linear_x += 0.1
+                vel_msg.linear.x = linear_x
             elif key == 's':
-                vel_msg = Twist()
-                vel_msg.linear.x = -0.5
-                pub.publish(vel_msg)
+                linear_x -= 0.1
+                vel_msg.linear.x = linear_x
             elif key == 'a':
-                vel_msg = Twist()
-                vel_msg.angular.z = 0.7
-                pub.publish(vel_msg)
+                angular_z += 0.1
+                vel_msg.angular.z = angular_z
             elif key == 'd':
-                vel_msg = Twist()
-                vel_msg.angular.z = -0.7
-                pub.publish(vel_msg)
+                angular_z -= 0.1
+                vel_msg.angular.z = angular_z
+            elif key == 'e':
+                angular_z = 0
+                linear_x = 0
+                vel_msg.linear.x = linear_x
+                vel_msg.angular.z = angular_z
             elif key == '\x03': # Ctrl+C
                 break
+            else:
+                angular_z = 0
+                vel_msg.angular.z = angular_z
+            
+            pub.publish(vel_msg)
 
-            rate.sleep()
 
     except KeyboardInterrupt:
         print("Shutting down")

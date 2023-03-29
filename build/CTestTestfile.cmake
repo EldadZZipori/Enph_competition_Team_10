@@ -7,6 +7,7 @@
 subdirs("gtest")
 subdirs("2022_competition/adeept_awr/adeept_awr")
 subdirs("2022_competition/adeept_awr/adeept_awr_description")
+subdirs("competition_pkg")
 subdirs("con")
 subdirs("2022_competition/enph353/enph353")
 subdirs("2022_competition/enph353/enph353_npcs")

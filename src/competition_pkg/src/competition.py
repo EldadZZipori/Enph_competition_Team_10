@@ -16,7 +16,7 @@ if __name__=="__main__":
     
     rospy.init_node("competition", anonymous=True)
     
-    license_pub = rospy.Publisher("/license_plate", String, queue_size=10)
+    license_pub = rospy.Publisher("license_plate", String, queue_size=10)
     movement_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=10)
 
     license_pub.publish(START_TIMER)

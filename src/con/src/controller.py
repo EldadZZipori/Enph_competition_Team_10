@@ -2,7 +2,15 @@
 
 import rospy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import String
 import sys, select, termios, tty
+
+TEAM_NAME = "TeamRed"
+TEAM_PSW = "blla"
+
+START_TIMER = "%s,%s,0,XR58" % (TEAM_NAME, TEAM_PSW)
+END_TIMER = "%s,%s,-1,XR58" % (TEAM_NAME, TEAM_PSW)
+
 
 def getKey():
     """
@@ -30,16 +38,16 @@ if __name__=="__main__":
             key = getKey()
             if key == 'w':
                 print(linear_x)
-                linear_x += 0.1
+                linear_x += 0.15
                 vel_msg.linear.x = linear_x
             elif key == 's':
-                linear_x -= 0.1
+                linear_x -= 0.15
                 vel_msg.linear.x = linear_x
             elif key == 'a':
-                angular_z += 0.1
+                angular_z += 0.2
                 vel_msg.angular.z = angular_z
             elif key == 'd':
-                angular_z -= 0.1
+                angular_z -= 0.2
                 vel_msg.angular.z = angular_z
             elif key == 'e':
                 angular_z = 0

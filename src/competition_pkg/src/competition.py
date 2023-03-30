@@ -19,6 +19,8 @@ if __name__=="__main__":
     license_pub = rospy.Publisher("license_plate", String, queue_size=10)
     movement_pub = rospy.Publisher("/R1/cmd_vel", Twist, queue_size=10)
 
+    time.sleep(1)
+
     license_pub.publish(START_TIMER)
     print(str(START_TIMER))
 

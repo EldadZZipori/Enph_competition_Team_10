@@ -4,6 +4,7 @@ import rospy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 import sys, select, termios, tty
+import time
 
 TEAM_NAME = "TeamRed"
 TEAM_PSW = "blla"
@@ -28,38 +29,31 @@ if __name__=="__main__":
     rospy.init_node('moving_robot', anonymous=True)
     pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
     rate = rospy.Rate(10) # 10hz
-
-    linear_x = 0
-    angular_z = 0
     vel_msg = Twist()
 
     try:
         while not rospy.is_shutdown():
             key = getKey()
             if key == 'w':
-                print(linear_x)
-                linear_x += 0.15
-                vel_msg.linear.x = linear_x
+                vel_msg.linear.x = 0.4
             elif key == 's':
-                linear_x -= 0.15
-                vel_msg.linear.x = linear_x
+                vel_msg.linear.x = -0.4
             elif key == 'a':
-                angular_z += 0.2
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = 0.7
             elif key == 'd':
-                angular_z -= 0.2
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = -0.7
             elif key == 'e':
-                angular_z = 0
-                linear_x = 0
-                vel_msg.linear.x = linear_x
-                vel_msg.angular.z = angular_z
+                vel_msg.linear.x = 0
+                vel_msg.angular.z = 0
             elif key == '\x03': # Ctrl+C
                 break
             else:
-                angular_z = 0
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = 0
             
+            pub.publish(vel_msg)
+            time.sleep(0.2)
+            vel_msg.linear.x = 0
+            vel_msg.angular.z = 0
             pub.publish(vel_msg)
 
 

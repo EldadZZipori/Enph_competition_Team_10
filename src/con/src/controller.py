@@ -23,13 +23,39 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
+def firstStrokeDrive(twist_msg):
+    twist_msg.linear.x = 1
+    pub.publish(twist_msg)
+    rospy.sleep(1)
+    twist_msg.linear.x = 0
+    pub.publish(twist_msg)
+    return None
+
+
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)
+
+    # print all model names
+    """
+    # Create a ROS client for the GetWorldProperties service
+    rospy.wait_for_service("/gazebo/get_world_properties")
+    get_world_properties = rospy.ServiceProxy("/gazebo/get_world_properties", GetWorldProperties)
+
+    # Call the GetWorldProperties service to get the list of model names
+    response = get_world_properties()
+    model_names = response.model_names
+
+    # Print the names of all the models in the world
+    for name in model_names:
+        print(name)
+    """
 
     rospy.init_node('moving_robot', anonymous=True)
     pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
     rate = rospy.Rate(10) # 10hz
     vel_msg = Twist()
+
+    firstStrokeDrive(vel_msg)
 
     try:
         while not rospy.is_shutdown():
@@ -45,13 +71,18 @@ if __name__=="__main__":
             elif key == 'e':
                 vel_msg.linear.x = 0
                 vel_msg.angular.z = 0
+            elif key == 'r':
+
+
+                # Kill the existing instance of the node
+                os.system("rosnode kill " + NODE_NAME)
             elif key == '\x03': # Ctrl+C
                 break
             else:
                 vel_msg.angular.z = 0
             
             pub.publish(vel_msg)
-            time.sleep(0.2)
+            rospy.sleep(0.2)
             vel_msg.linear.x = 0
             vel_msg.angular.z = 0
             pub.publish(vel_msg)

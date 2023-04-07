@@ -1,0 +1,8 @@
+<launch>
+   <!-- My Package launch file -->
+   <node pkg="competition_pkg"
+         type="competition.py"
+         name="competition" 
+         output="screen">
+   </node>
+</launch>

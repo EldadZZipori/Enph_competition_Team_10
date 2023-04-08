@@ -24,11 +24,29 @@ def getKey():
     return key
 
 def firstStrokeDrive(twist_msg):
-    twist_msg.linear.x = 1
+    twist_msg.linear.x = 0.5
     pub.publish(twist_msg)
-    rospy.sleep(1)
+    rospy.sleep(0.8) # straight
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.7
+    pub.publish(twist_msg)
+    rospy.sleep(3.2) # first left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    pub.publish(twist_msg)
+    rospy.sleep(2.5) # first parking plate
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.7
+    pub.publish(twist_msg)
+    rospy.sleep(2.8) # second left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    pub.publish(twist_msg)
+    rospy.sleep(2)
     twist_msg.linear.x = 0
     pub.publish(twist_msg)
+
+
     return None
 
 
@@ -54,6 +72,7 @@ if __name__=="__main__":
     pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
     rate = rospy.Rate(10) # 10hz
     vel_msg = Twist()
+    rospy.sleep(2)
 
     firstStrokeDrive(vel_msg)
 

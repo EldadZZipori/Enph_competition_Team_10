@@ -4,6 +4,7 @@ import rospy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 import sys, select, termios, tty
+import time
 
 TEAM_NAME = "TeamRed"
 TEAM_PSW = "blla"
@@ -22,44 +23,87 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
+def firstStrokeDrive(twist_msg):
+    twist_msg.linear.x = 0.5
+    pub.publish(twist_msg)
+    rospy.sleep(0.8) # straight
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.7
+    pub.publish(twist_msg)
+    rospy.sleep(3.2) # first left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    pub.publish(twist_msg)
+    rospy.sleep(2.5) # first parking plate
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.7
+    pub.publish(twist_msg)
+    rospy.sleep(2.8) # second left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    pub.publish(twist_msg)
+    rospy.sleep(2)
+    twist_msg.linear.x = 0
+    pub.publish(twist_msg)
+
+
+    return None
+
+
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)
+
+    # print all model names
+    """
+    # Create a ROS client for the GetWorldProperties service
+    rospy.wait_for_service("/gazebo/get_world_properties")
+    get_world_properties = rospy.ServiceProxy("/gazebo/get_world_properties", GetWorldProperties)
+
+    # Call the GetWorldProperties service to get the list of model names
+    response = get_world_properties()
+    model_names = response.model_names
+
+    # Print the names of all the models in the world
+    for name in model_names:
+        print(name)
+    """
 
     rospy.init_node('moving_robot', anonymous=True)
     pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
     rate = rospy.Rate(10) # 10hz
-
-    linear_x = 0
-    angular_z = 0
     vel_msg = Twist()
+    rospy.sleep(2)
+
+    firstStrokeDrive(vel_msg)
 
     try:
         while not rospy.is_shutdown():
             key = getKey()
             if key == 'w':
-                print(linear_x)
-                linear_x += 0.15
-                vel_msg.linear.x = linear_x
+                vel_msg.linear.x = 0.4
             elif key == 's':
-                linear_x -= 0.15
-                vel_msg.linear.x = linear_x
+                vel_msg.linear.x = -0.4
             elif key == 'a':
-                angular_z += 0.2
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = 0.7
             elif key == 'd':
-                angular_z -= 0.2
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = -0.7
             elif key == 'e':
-                angular_z = 0
-                linear_x = 0
-                vel_msg.linear.x = linear_x
-                vel_msg.angular.z = angular_z
+                vel_msg.linear.x = 0
+                vel_msg.angular.z = 0
+            elif key == 'r':
+
+
+                # Kill the existing instance of the node
+                os.system("rosnode kill " + NODE_NAME)
             elif key == '\x03': # Ctrl+C
                 break
             else:
-                angular_z = 0
-                vel_msg.angular.z = angular_z
+                vel_msg.angular.z = 0
             
+            pub.publish(vel_msg)
+            rospy.sleep(0.2)
+            vel_msg.linear.x = 0
+            vel_msg.angular.z = 0
             pub.publish(vel_msg)
 
 

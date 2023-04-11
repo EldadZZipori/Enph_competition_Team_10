@@ -23,6 +23,10 @@ class LicensePlate():
 
     #initiate the object
     def __init__(self):
+
+        tf.keras.backend.clear_session()
+
+
         self.bridge = CvBridge()
         self.imageSubscriber = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.findandread)
         self.ReadPublisher = rospy.Publisher('/license_plate', String, queue_size = 10)
@@ -178,11 +182,14 @@ class LicensePlate():
         return one_hot_label
 
     
-    # Create object
-    bridge = Cv.Bridge()
-    image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, callback) #subscribe calls the callback func like an interrupt
-    #license_pub = rospy.Publisher("license_plate", String, queue_size=10)
+# # Create object; it's wrong -> shouldn't be in a class
+# bridge = Cv.Bridge()
+# image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, callback) #subscribe calls the callback func like an interrupt
+# #license_pub = rospy.Publisher("license_plate", String, queue_size=10)
 
-    cv.destroyAllWindows()
+# cv.destroyAllWindows()
 
 
+# Create the object
+licensePlates = LicensePlate()
+rospy.spin() #has infinite loop

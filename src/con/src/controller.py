@@ -35,7 +35,7 @@ center_line = 1280 / 2
 
 y_location = 600
 
-distance_from_red_line = 320
+distance_from_red_line = 400
 
 
 def getKey():
@@ -181,8 +181,8 @@ def padestrian_detection(cv_image):
             distance = int(abs(slope * x - y + y_intercept) / math.sqrt(slope**2 + 1))
             
             #print(distance)
-            if distance >= distance_from_red_line - 20 or distance <= distance_from_red_line + 20:
-                print("found")
+            if distance >= distance_from_red_line - 20 and distance <= distance_from_red_line + 20:
+                #print("found")
                 twist_msg.linear.x = 0
                 twist_msg.angular.z = 0
                 mov_pub.publish(twist_msg)

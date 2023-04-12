@@ -8,6 +8,7 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 import sys, select, termios, tty
+import time
 import math
 
 TEAM_NAME = "TeamRed"
@@ -17,6 +18,7 @@ START_TIMER = "%s,%s,0,XR58" % (TEAM_NAME, TEAM_PSW)
 END_TIMER = "%s,%s,-1,XR58" % (TEAM_NAME, TEAM_PSW)
 
 PID_DRIVE_FLAG = False
+RED_LINE_FLAG = False
 
 # Initialize the error variables
 last_error = 0
@@ -37,6 +39,11 @@ y_location = 600
 
 distance_from_red_line = 400
 
+previous_x = -1
+
+twist_msg = Twist()
+
+
 
 def getKey():
     """
@@ -49,6 +56,7 @@ def getKey():
     return key
 
 def firstStrokeDrive():
+    global twist_msg
 
     twist_msg.linear.x = 0.5
     mov_pub.publish(twist_msg)
@@ -80,7 +88,7 @@ def firstStrokeDrive():
     return None
 
 def image_callback(image):
-    global last_error, integral_error, PID_DRIVE_FLAG
+    global last_error, integral_error, PID_DRIVE_FLAG, twist_msg
 
     try:
         cv_image = cv_bridge.imgmsg_to_cv2(image, "bgr8")
@@ -140,11 +148,11 @@ def image_callback(image):
     control_output = kp * error #+ ki * integral_error + kd * derivative_error
     #print(control_output)
 
-    padestrian_detection(cv_image)
+    pedestrian_detection(cv_image)
+    detection_on_grass(cv_image)
 
     # Publish the control output as a twist message
     if PID_DRIVE_FLAG: 
-        twist_msg = Twist()
         twist_msg.linear.x = 0.2
         twist_msg.angular.z = control_output
         mov_pub.publish(twist_msg)
@@ -153,45 +161,112 @@ def image_callback(image):
     last_error = error
     return None
 
-def padestrian_detection(cv_image):
-    global PID_DRIVE_FLAG
+def pedestrian_detection(cv_image):
+    global PID_DRIVE_FLAG, RED_LINE_FLAG, previous_x
+
     hsv = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
-
-    lower_red = np.array([0, 50, 50])
-    upper_red = np.array([10, 255, 255])
-    mask = cv.inRange(hsv, lower_red, upper_red)
-
     kernel = np.ones((5,5), np.uint8)
-    mask = cv.erode(mask, kernel, iterations=1)
-    mask = cv.dilate(mask, kernel, iterations=1)
 
-    contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    cv.drawContours(cv_image, contours, -1, (0, 0, 255), 2)
+    if PID_DRIVE_FLAG: # detect the red line
 
-    if not len(contours) == 0:
-        for cnt in contours:
-            # Fit a line to the contour
-            [vx, vy, x, y] = cv.fitLine(cnt, cv.DIST_L2, 0, 0.01, 0.01)
-            slope = vy / vx
-            y_intercept = y - slope * x
+        lower_red = np.array([0, 50, 50])
+        upper_red = np.array([10, 255, 255])
 
-            # Calculate the distance from the line to a point (x,y)
-            x = 100 # Replace with the x coordinate of the point you want to calculate the distance to the line
-            y = 200 # Replace with the y coordinate of the point you want to calculate the distance to the line
-            distance = int(abs(slope * x - y + y_intercept) / math.sqrt(slope**2 + 1))
-            
-            #print(distance)
-            if distance >= distance_from_red_line - 20 and distance <= distance_from_red_line + 20:
-                #print("found")
-                twist_msg.linear.x = 0
-                twist_msg.angular.z = 0
-                mov_pub.publish(twist_msg)
-                PID_DRIVE_FLAG = False
+        red_mask = cv.inRange(hsv, lower_red, upper_red)
 
-    cv.imshow('image', cv_image)
-    cv.waitKey(3)
+        red_mask = cv.erode(red_mask, kernel, iterations=1)
+        red_mask = cv.dilate(red_mask, kernel, iterations=1)
+
+        contours, hierarchy = cv.findContours(red_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        cv.drawContours(cv_image, contours, -1, (0, 0, 255), 2)
+
+        if not len(contours) == 0:
+            for cnt in contours:
+                # Fit a line to the contour
+                [vx, vy, x, y] = cv.fitLine(cnt, cv.DIST_L2, 0, 0.01, 0.01)
+                slope = vy / vx
+                y_intercept = y - slope * x
+
+                # Calculate the distance from the line to a point (x,y)
+                x = 100 # Replace with the x coordinate of the point you want to calculate the distance to the line
+                y = 200 # Replace with the y coordinate of the point you want to calculate the distance to the line
+                distance = int(abs(slope * x - y + y_intercept) / math.sqrt(slope**2 + 1))
+                
+                #print(distance)
+                if distance >= distance_from_red_line - 20 and distance <= distance_from_red_line + 20:
+                    #print("found")
+                    twist_msg.linear.x = 0
+                    twist_msg.angular.z = 0
+                    mov_pub.publish(twist_msg)
+                    PID_DRIVE_FLAG = False
+                    RED_LINE_FLAG = True
+
+    elif RED_LINE_FLAG:
+        #print("pedestrian")
+        # Load the pedestrian detector
+        hog = cv.HOGDescriptor()
+        hog.setSVMDetector(cv.HOGDescriptor_getDefaultPeopleDetector())
+
+        height = cv_image.shape[0]
+
+        # Define the region of interest
+        roi = cv_image[height-400:height, :]
+
+        # Detect pedestrians in the image
+        pedestrians, weights = hog.detectMultiScale(roi, winStride=(8, 8), padding=(32, 32), scale=1.05, groupThreshold=2)
+
+        # Draw bounding boxes around the detected pedestrians
+        for (x, y, w, h) in pedestrians:
+            # Check if the detected object is too tall to be a pedestrian
+            if h/w > 3:
+                continue
+            # cv.rectangle(roi, (x, y), (x + w, y + h), (0, 0, 255), 2)
+
+            if previous_x == -1:
+                previous_x = x
+            elif previous_x < 600:
+                if x > 780: # continue driving 
+                    cross()
+            else:
+                if x < 515: #continue driving 
+                    cross()
+        rospy.sleep(0.1)
+
     return None
 
+def cross():
+    global previous_x,twist_msg, PID_DRIVE_FLAG, RED_LINE_FLAG
+    previous_x = -1
+    RED_LINE_FLAG = False
+
+    twist_msg.linear.x = 0.8
+    mov_pub.publish(twist_msg)
+    print(RED_LINE_FLAG) #idk why this only works when i print
+    rospy.sleep(0.9)
+    twist_msg.linear.x = 0
+    mov_pub.publish(twist_msg)
+
+    rospy.sleep(0.1)
+    PID_DRIVE_FLAG = True
+
+def detection_on_grass(cv_image):
+    global twist_msg
+    # Convert the image to HSV color space
+    hsv = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
+
+    # Define the lower and upper bounds of the green color in HSV
+    lower_green = np.array([120, 120, 90])
+    upper_green = np.array([160, 160, 110])
+
+    # Threshold the image to extract all colors except green
+    mask = cv.inRange(hsv, lower_green, upper_green)
+
+    # Apply the mask to the original image
+    result = cv.bitwise_and(cv_image, cv_image, mask=mask)
+
+    # Display the result
+    cv.imshow('White Lines Detection', cv_image)
+    cv.waitKey(3)
 
 """
 Init Rospy
@@ -201,8 +276,7 @@ mov_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw',Image, image_callback)
 cv_bridge = CvBridge()
 rate = rospy.Rate(10) # 10hz
-twist_msg = Twist()
-rospy.sleep(2)
+rospy.sleep(1)
 
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)

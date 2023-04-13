@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+"""
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
@@ -32,3 +32,4 @@ if __name__=="__main__":
     print(str(END_TIMER))
 
     rospy.spin()
+"""

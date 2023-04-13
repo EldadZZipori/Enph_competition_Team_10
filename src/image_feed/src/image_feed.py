@@ -18,6 +18,9 @@ from tensorflow.keras import backend
 from tensorflow.python.keras.backend import set_session
 from tensorflow.python.keras.models import load_model
 
+TEAM_NAME = "Team11"
+TEAM_PSW = "JessEldad"
+
 lower_blue_list = [
     [100, 150, 80], #darker
     [100, 120, 80], #light
@@ -74,6 +77,7 @@ class LicensePlate():
         if (lic_plate and parkpos is not None):
             plate, position = self.decipherPlate(self, lic_plate, parkpos)
             print("plate = {} in P{}".format(plate, position))
+            self.ReadPublisher.publish("%s,%s,%s,%s" % (TEAM_NAME, TEAM_PSW, pos, plate))
 
         return None
 

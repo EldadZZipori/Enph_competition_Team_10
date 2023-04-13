@@ -11,7 +11,7 @@ import sys, select, termios, tty
 import time
 import math
 
-TEAM_NAME = "SlayQs"
+TEAM_NAME = "Team11"
 TEAM_PSW = "JessEldad"
 
 START_TIMER = "%s,%s,0,XR58" % (TEAM_NAME, TEAM_PSW)

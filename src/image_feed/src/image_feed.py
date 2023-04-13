@@ -50,7 +50,9 @@ class LicensePlate():
         self.int_to_pos = dict((i,c) for i,c in enumerate(self.parkpos))
 
         # load the model
-        
+        #self.sess = tf.keras.backend.get_session()
+        self.conv_model = models.load_model("/home/fizzer/ros_ws/src/image_feed/model_v2")
+        self.conv_model.make_predict_function()
 
 
         self.bridge = CvBridge()

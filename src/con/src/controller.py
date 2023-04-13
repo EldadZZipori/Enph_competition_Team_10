@@ -128,7 +128,7 @@ def hill_hard_code():
 
 def image_callback(image):
     global last_error, integral_error, PID_DRIVE_FLAG, twist_msg, x_axis_len, y_axis_len, pedestrians_seen, ENTER_CENTER, previous_enter_inner_detection, cross_wait
-    print(PID_DRIVE_FLAG)
+    
     try:
         cv_image = cv_bridge.imgmsg_to_cv2(image, "bgr8")
     except CvBridgeError as e:

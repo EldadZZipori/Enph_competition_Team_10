@@ -19,21 +19,21 @@ END_TIMER = "%s,%s,-1,XR58" % (TEAM_NAME, TEAM_PSW)
 
 PID_DRIVE_FLAG = False
 RED_LINE_FLAG = False
-DEBUG = True
+DEBUG = False
 ENTER_CENTER = False
-PEDESTRIAN_TARGET = 1
+PEDESTRIAN_TARGET = 2
 
 # Initialize the error variables
 last_error = 0
 integral_error = 0
 
 # Initialize the PID constants
-kp = 0.0086
+kp = 0.009
 ki = 0.0001
 kd = 0.0001
 
 # Define the target distance from the right line (in pixels)
-target_distance = 400
+target_distance = 380
 
 # Define the center line of the image
 center_line = 1280 / 2
@@ -47,8 +47,9 @@ distance_from_red_line = 400
 previous_x = -1
 
 previous_enter_inner_detection = []
+cross_wait = []
 
-pedestrians_seen = 1
+pedestrians_seen = 0
 
 twist_msg = Twist()
 
@@ -73,7 +74,7 @@ def firstStrokeDrive():
     twist_msg.linear.x = 0
     twist_msg.angular.z = 0.7
     mov_pub.publish(twist_msg)
-    rospy.sleep(3.2) # first left turn
+    rospy.sleep(3.1) # first left turn
 
     """
     twist_msg.angular.z = 0
@@ -96,9 +97,38 @@ def firstStrokeDrive():
 
     return None
 
-def image_callback(image):
-    global last_error, integral_error, PID_DRIVE_FLAG, twist_msg, x_axis_len, y_axis_len, pedestrians_seen, ENTER_CENTER, previous_enter_inner_detection
+def hill_hard_code():
+    global twist_msg, PID_DRIVE_FLAG
 
+    twist_msg.linear.x = 0.5
+    mov_pub.publish(twist_msg)
+    rospy.sleep(0.5) # straight
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.8
+    mov_pub.publish(twist_msg)
+    rospy.sleep(2.52) # first left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    mov_pub.publish(twist_msg)
+    rospy.sleep(4.9) # first parking plate
+    twist_msg.linear.x = 0
+    twist_msg.angular.z = 0.8
+    mov_pub.publish(twist_msg)
+    rospy.sleep(2.6) # first left turn
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0.5
+    mov_pub.publish(twist_msg)
+    rospy.sleep(1) # first parking plate
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0
+    mov_pub.publish(twist_msg)
+
+    PID_DRIVE_FLAG = True
+
+
+def image_callback(image):
+    global last_error, integral_error, PID_DRIVE_FLAG, twist_msg, x_axis_len, y_axis_len, pedestrians_seen, ENTER_CENTER, previous_enter_inner_detection, cross_wait
+    print(PID_DRIVE_FLAG)
     try:
         cv_image = cv_bridge.imgmsg_to_cv2(image, "bgr8")
     except CvBridgeError as e:
@@ -141,7 +171,6 @@ def image_callback(image):
     if ENTER_CENTER and first_white_location_left == -1 and first_blue_location_left == -1: 
         previous_enter_inner_detection.append(1)
         if len(previous_enter_inner_detection) ==  30:
-            print("here")
             PID_DRIVE_FLAG = False
             #enter_inner()
             #PID_DRIVE_FLAG = True
@@ -152,8 +181,8 @@ def image_callback(image):
     """
     PID control
     """
-    #cv.imshow("", white)
-    #cv.waitKey(3)
+    cv.imshow("", cv_image)
+    cv.waitKey(3)
 
     # Compute the PID control output
     integral_error += error
@@ -165,6 +194,7 @@ def image_callback(image):
 
     # Publish the control output as a twist message
     if PID_DRIVE_FLAG: 
+        cross_wait.append(1)
         twist_msg.linear.x = 0.2
         twist_msg.angular.z = control_output
         mov_pub.publish(twist_msg)
@@ -174,7 +204,7 @@ def image_callback(image):
     return None
 
 def pedestrian_detection(cv_image):
-    global PID_DRIVE_FLAG, RED_LINE_FLAG, previous_x
+    global PID_DRIVE_FLAG, RED_LINE_FLAG, previous_x, cross_wait
 
     hsv = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
     kernel = np.ones((5,5), np.uint8)
@@ -204,14 +234,15 @@ def pedestrian_detection(cv_image):
                 y = 200 # Replace with the y coordinate of the point you want to calculate the distance to the line
                 distance = int(abs(slope * x - y + y_intercept) / math.sqrt(slope**2 + 1))
                 
-                #print(distance)
-                if distance >= distance_from_red_line - 20 and distance <= distance_from_red_line + 20:
+                #print(len(cross_wait))
+                if distance >= distance_from_red_line - 20 and distance <= distance_from_red_line + 20 and len(cross_wait) > 100: 
                     #print("found")
                     twist_msg.linear.x = 0
                     twist_msg.angular.z = 0
                     mov_pub.publish(twist_msg)
                     PID_DRIVE_FLAG = False
                     RED_LINE_FLAG = True
+                    return None
 
     elif RED_LINE_FLAG:
         #print("pedestrian")
@@ -247,21 +278,26 @@ def pedestrian_detection(cv_image):
     return None
 
 def cross():
-    global previous_x,twist_msg, pedestrians_seen, PID_DRIVE_FLAG, RED_LINE_FLAG
+    global previous_x,twist_msg, pedestrians_seen, PID_DRIVE_FLAG, RED_LINE_FLAG,cross_wait
+    cross_wait = []
     previous_x = -1
     RED_LINE_FLAG = False
 
     twist_msg.linear.x = 0.8
     mov_pub.publish(twist_msg)
-    print(RED_LINE_FLAG) #idk why this only works when i print
     rospy.sleep(0.9)
     twist_msg.linear.x = 0
     mov_pub.publish(twist_msg)
-
-    rospy.sleep(0.1)
-    PID_DRIVE_FLAG = True
-
     pedestrians_seen += 1
+
+    if not pedestrians_seen == 2:
+        PID_DRIVE_FLAG = True
+        rospy.sleep(1)
+    else:
+        pedestrians_seen = 0
+        hill_hard_code()
+
+    return None
 
 def enter_inner():
     global twist_msg
@@ -288,9 +324,9 @@ def detection_on_grass(cv_image):
     adjusted_img = cv.convertScaleAbs(thresh, alpha=alpha, beta=beta)
 
     # Display the result
-    if DEBUG and not pedestrians_seen == PEDESTRIAN_TARGET:
-        cv.imshow('White Lines Detection', adjusted_img)
-        cv.waitKey(3)
+    #if DEBUG and not pedestrians_seen == PEDESTRIAN_TARGET:
+        #cv.imshow('White Lines Detection', adjusted_img)
+        #cv.waitKey(3)
 
     return adjusted_img
 
@@ -327,7 +363,7 @@ def detect_blue(cv_image):
 
 def detect_left_line(white):
     first_white_location_left = -1
-    for index in reversed(range(int(x_axis_len / 2) - int(target_distance + 40), int(x_axis_len / 2))):
+    for index in reversed(range(int(x_axis_len / 2) - int(target_distance), int(x_axis_len / 2))):
         color = white[y_location][index]
         #R, G, B = color
         #if R >= 245 and G >= 245 and B >= 245:
@@ -350,6 +386,7 @@ def detect_right_line(white):
 Init Rospy
 """
 rospy.init_node('moving_robot', anonymous=True)
+license_pub = rospy.Publisher("license_plate", String, queue_size=10)
 mov_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw',Image, image_callback)
 cv_bridge = CvBridge()
@@ -359,48 +396,57 @@ rospy.sleep(1)
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)
     
-    try:
-        while not rospy.is_shutdown():
-            key = getKey()
-            if key == 'w':
-                twist_msg.linear.x = 0.4
-            elif key == 's':
-                twist_msg.linear.x = -0.4
-            elif key == 'a':
-                twist_msg.angular.z = 0.7
-            elif key == 'd':
-                twist_msg.angular.z = -0.7
-            elif key == 'e':
+    if DEBUG:
+        try:
+            while not rospy.is_shutdown():
+                key = getKey()
+                if key == 'w':
+                    twist_msg.linear.x = 0.4
+                elif key == 's':
+                    twist_msg.linear.x = -0.4
+                elif key == 'a':
+                    twist_msg.angular.z = 0.7
+                elif key == 'd':
+                    twist_msg.angular.z = -0.7
+                elif key == 'e':
+                    twist_msg.linear.x = 0
+                    twist_msg.angular.z = 0
+                elif key == 'p':
+                    PID_DRIVE_FLAG = not PID_DRIVE_FLAG
+                elif key == 'f':
+                    firstStrokeDrive()
+                elif key == 'i':
+                    ENTER_CENTER = not ENTER_CENTER
+                    print("[*] Inner loop", ENTER_CENTER)
+                elif key == 'c':
+                    RED_LINE_FLAG = not RED_LINE_FLAG
+                    print("[*] Crosswalk", RED_LINE_FLAG)
+                elif key == 'h':
+                    hill_hard_code()
+                elif key == '\x03': # Ctrl+C
+                    break
+                else:
+                    twist_msg.angular.z = 0
+                
+                mov_pub.publish(twist_msg)
+                rospy.sleep(0.2)
                 twist_msg.linear.x = 0
                 twist_msg.angular.z = 0
-            elif key == 'p':
-                PID_DRIVE_FLAG = not PID_DRIVE_FLAG
-            elif key == 'f':
-                firstStrokeDrive()
-            elif key == 'i':
-                ENTER_CENTER = not ENTER_CENTER
-                print("[*] Inner loop", ENTER_CENTER)
-            elif key == 'c':
-                RED_LINE_FLAG = not RED_LINE_FLAG
-                print("[*] Crosswalk", RED_LINE_FLAG)
-            elif key == '\x03': # Ctrl+C
-                break
-            else:
-                twist_msg.angular.z = 0
-            
+                mov_pub.publish(twist_msg)
+
+
+        except KeyboardInterrupt:
+            print("Shutting down")
+
+        finally:
+            twist_msg = Twist()
+            twist_msg.linear.x = 0.0
+            twist_msg.angular.z = 0.0
             mov_pub.publish(twist_msg)
-            rospy.sleep(0.2)
-            twist_msg.linear.x = 0
-            twist_msg.angular.z = 0
-            mov_pub.publish(twist_msg)
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
 
-
-    except KeyboardInterrupt:
-        print("Shutting down")
-
-    finally:
-        twist_msg = Twist()
-        twist_msg.linear.x = 0.0
-        twist_msg.angular.z = 0.0
-        mov_pub.publish(twist_msg)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+    else: # competition
+        license_pub.publish(START_TIMER)
+        firstStrokeDrive()
+        PID_DRIVE_FLAG = True
+        rospy.spin()

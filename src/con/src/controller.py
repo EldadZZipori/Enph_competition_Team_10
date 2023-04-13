@@ -11,8 +11,8 @@ import sys, select, termios, tty
 import time
 import math
 
-TEAM_NAME = "TeamRed"
-TEAM_PSW = "blla"
+TEAM_NAME = "SlayQs"
+TEAM_PSW = "JessEldad"
 
 START_TIMER = "%s,%s,0,XR58" % (TEAM_NAME, TEAM_PSW)
 END_TIMER = "%s,%s,-1,XR58" % (TEAM_NAME, TEAM_PSW)
@@ -28,7 +28,7 @@ last_error = 0
 integral_error = 0
 
 # Initialize the PID constants
-kp = 0.009
+kp = 0.01
 ki = 0.0001
 kd = 0.0001
 
@@ -104,7 +104,7 @@ def hill_hard_code():
     mov_pub.publish(twist_msg)
     rospy.sleep(0.5) # straight
     twist_msg.linear.x = 0
-    twist_msg.angular.z = 0.8
+    twist_msg.angular.z = 0.82
     mov_pub.publish(twist_msg)
     rospy.sleep(2.52) # first left turn
     twist_msg.angular.z = 0
@@ -181,8 +181,9 @@ def image_callback(image):
     """
     PID control
     """
-    cv.imshow("", cv_image)
-    cv.waitKey(3)
+    if DEBUG:
+        cv.imshow("", cv_image)
+        cv.waitKey(3)
 
     # Compute the PID control output
     integral_error += error
@@ -253,7 +254,7 @@ def pedestrian_detection(cv_image):
         height = cv_image.shape[0]
 
         # Define the region of interest
-        roi = cv_image[height-400:height, :]
+        roi = cv_image[height-390:height, :]
 
         # Detect pedestrians in the image
         pedestrians, weights = hog.detectMultiScale(roi, winStride=(8, 8), padding=(32, 32), scale=1.05, groupThreshold=2)
@@ -391,7 +392,7 @@ mov_pub = rospy.Publisher('/R1/cmd_vel', Twist, queue_size=10)
 image_sub = rospy.Subscriber('/R1/pi_camera/image_raw',Image, image_callback)
 cv_bridge = CvBridge()
 rate = rospy.Rate(10) # 10hz
-rospy.sleep(1)
+rospy.sleep(2)
 
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)

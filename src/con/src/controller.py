@@ -19,13 +19,16 @@ END_TIMER = "%s,%s,-1,XR58" % (TEAM_NAME, TEAM_PSW)
 
 PID_DRIVE_FLAG = False
 RED_LINE_FLAG = False
+DEBUG = True
+ENTER_CENTER = False
+PEDESTRIAN_TARGET = 1
 
 # Initialize the error variables
 last_error = 0
 integral_error = 0
 
 # Initialize the PID constants
-kp = 0.007
+kp = 0.0086
 ki = 0.0001
 kd = 0.0001
 
@@ -36,10 +39,16 @@ target_distance = 400
 center_line = 1280 / 2
 
 y_location = 600
+x_axis_len = 1280
+y_axis_len= 800
 
 distance_from_red_line = 400
 
 previous_x = -1
+
+previous_enter_inner_detection = []
+
+pedestrians_seen = 1
 
 twist_msg = Twist()
 
@@ -60,7 +69,7 @@ def firstStrokeDrive():
 
     twist_msg.linear.x = 0.5
     mov_pub.publish(twist_msg)
-    rospy.sleep(0.8) # straight
+    rospy.sleep(0.75) # straight
     twist_msg.linear.x = 0
     twist_msg.angular.z = 0.7
     mov_pub.publish(twist_msg)
@@ -88,7 +97,7 @@ def firstStrokeDrive():
     return None
 
 def image_callback(image):
-    global last_error, integral_error, PID_DRIVE_FLAG, twist_msg
+    global last_error, integral_error, PID_DRIVE_FLAG, twist_msg, x_axis_len, y_axis_len, pedestrians_seen, ENTER_CENTER, previous_enter_inner_detection
 
     try:
         cv_image = cv_bridge.imgmsg_to_cv2(image, "bgr8")
@@ -97,10 +106,10 @@ def image_callback(image):
 
     shape = cv_image.shape
        
-    x_axis_len = shape[1]
-    y_axis_len = shape[0]
+    #x_axis_len = shape[1]
+    #y_axis_len = shape[0]
 
-
+    """
     # Convert the image to grayscale
     gray = cv.cvtColor(cv_image, cv.COLOR_BGR2GRAY)
 
@@ -109,32 +118,36 @@ def image_callback(image):
 
     # Apply a bitwise AND operation to obtain only the white pixels
     white = cv.bitwise_and(cv_image, cv_image, mask=thresh)
+    """
+    white = detection_on_grass(cv_image)
+    first_white_location_right = detect_right_line(white)
+    first_white_location_left = detect_left_line(white)
+    error = 0 
+
     
-    first_white_location_right = -1
-
-    for index in range(int(x_axis_len / 2) ,int(x_axis_len / 2) + int(target_distance)):
-        color = white[y_location][index]
-        R, G, B = color
-        if R >= 245 and G >= 245 and B >= 245:
-            first_white_location_right = index
-            index = y_axis_len + 1
-
     if not first_white_location_right == -1:
         distance_from_right = first_white_location_right - center_line
         error = -1 * (distance_from_right - target_distance) # needs to be negative 
-    else:
-        first_white_location_left = -1
-        for index in reversed(range(int(x_axis_len / 2) - int(target_distance), int(x_axis_len / 2))):
-            color = white[y_location][index]
-            R, G, B = color
-            if R >= 245 and G >= 245 and B >= 245:
-                first_white_location_left = index
-                index = y_axis_len + 1
+    if first_white_location_right == -1: # change to depend on how many pedestrains are detected
+        
         if not first_white_location_left == -1:
             distance_from_left = center_line - first_white_location_left
             error = (distance_from_left  - target_distance) # needs to be positive
         else:
             error = last_error
+    
+    first_blue_location_left = detect_blue(cv_image)
+    
+    if ENTER_CENTER and first_white_location_left == -1 and first_blue_location_left == -1: 
+        previous_enter_inner_detection.append(1)
+        if len(previous_enter_inner_detection) ==  30:
+            print("here")
+            PID_DRIVE_FLAG = False
+            #enter_inner()
+            #PID_DRIVE_FLAG = True
+            
+    else:
+        previous_enter_inner_detection = []
 
     """
     PID control
@@ -149,7 +162,6 @@ def image_callback(image):
     #print(control_output)
 
     pedestrian_detection(cv_image)
-    detection_on_grass(cv_image)
 
     # Publish the control output as a twist message
     if PID_DRIVE_FLAG: 
@@ -235,7 +247,7 @@ def pedestrian_detection(cv_image):
     return None
 
 def cross():
-    global previous_x,twist_msg, PID_DRIVE_FLAG, RED_LINE_FLAG
+    global previous_x,twist_msg, pedestrians_seen, PID_DRIVE_FLAG, RED_LINE_FLAG
     previous_x = -1
     RED_LINE_FLAG = False
 
@@ -249,24 +261,90 @@ def cross():
     rospy.sleep(0.1)
     PID_DRIVE_FLAG = True
 
-def detection_on_grass(cv_image):
+    pedestrians_seen += 1
+
+def enter_inner():
     global twist_msg
+
+    twist_msg.angular.z = 0
+    twist_msg.linear.x = 0
+    mov_pub.publish(twist_msg)
+    twist_msg.angular.z = 0.7
+    mov_pub.publish(twist_msg)
+    rospy.sleep(3.2) # first left turn
+
+def detection_on_grass(cv_image):
+    global twist_msg, DEBUG
     # Convert the image to HSV color space
+    gray = cv.cvtColor(cv_image, cv.COLOR_BGR2GRAY)
+
+    # Apply a threshold to make white colors stronger
+    thresh_value = 175
+    _, thresh = cv.threshold(gray, thresh_value, 255, cv.THRESH_BINARY)
+
+    # Apply a contrast adjustment
+    alpha = 2.2  # Contrast control (1.0-3.0)
+    beta = 0    # Brightness control (0-100)
+    adjusted_img = cv.convertScaleAbs(thresh, alpha=alpha, beta=beta)
+
+    # Display the result
+    if DEBUG and not pedestrians_seen == PEDESTRIAN_TARGET:
+        cv.imshow('White Lines Detection', adjusted_img)
+        cv.waitKey(3)
+
+    return adjusted_img
+
+def detect_blue(cv_image):
+    global pedestrians_seen, DEBUG, x_axis_len, y_axis_len
+    # Convert the image to the HSV color space
     hsv = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
 
-    # Define the lower and upper bounds of the green color in HSV
-    lower_green = np.array([120, 120, 90])
-    upper_green = np.array([160, 160, 110])
+    # Define the lower and upper bounds of the blue color in HSV
+    lower_blue = np.array([100, 50, 50])
+    upper_blue = np.array([130, 255, 255])
 
-    # Threshold the image to extract all colors except green
-    mask = cv.inRange(hsv, lower_green, upper_green)
+    # Threshold the image to extract blue colors
+    mask = cv.inRange(hsv, lower_blue, upper_blue)
 
     # Apply the mask to the original image
     result = cv.bitwise_and(cv_image, cv_image, mask=mask)
+    first_blue_location_left = -1
 
-    # Display the result
-    cv.imshow('White Lines Detection', cv_image)
-    cv.waitKey(3)
+    for index in reversed(range(int(x_axis_len / 2) - int(target_distance + 100), int(x_axis_len / 2))):
+        color = result[y_location][index]
+        R, G, B = color
+        if R >= 110 and G >= 10 and B >= 10:
+        #if color >= 1:
+            first_blue_location_left = index
+            index = y_axis_len + 1
+
+    if DEBUG:
+        cv.imshow('Filtered Image', result)
+        cv.waitKey(3)
+
+    return first_blue_location_left
+
+
+def detect_left_line(white):
+    first_white_location_left = -1
+    for index in reversed(range(int(x_axis_len / 2) - int(target_distance + 40), int(x_axis_len / 2))):
+        color = white[y_location][index]
+        #R, G, B = color
+        #if R >= 245 and G >= 245 and B >= 245:
+        if color >= 1:
+            first_white_location_left = index
+            index = y_axis_len + 1
+    return first_white_location_left
+
+def detect_right_line(white):
+    first_white_location_right = -1
+    for index in range(int(x_axis_len / 2) ,int(x_axis_len / 2) + int(target_distance)):
+        color = white[y_location][index]
+        #R, G, B = color
+        if color >= 1:
+            first_white_location_right = index
+            index = y_axis_len + 1
+    return first_white_location_right
 
 """
 Init Rospy
@@ -299,6 +377,12 @@ if __name__=="__main__":
                 PID_DRIVE_FLAG = not PID_DRIVE_FLAG
             elif key == 'f':
                 firstStrokeDrive()
+            elif key == 'i':
+                ENTER_CENTER = not ENTER_CENTER
+                print("[*] Inner loop", ENTER_CENTER)
+            elif key == 'c':
+                RED_LINE_FLAG = not RED_LINE_FLAG
+                print("[*] Crosswalk", RED_LINE_FLAG)
             elif key == '\x03': # Ctrl+C
                 break
             else:

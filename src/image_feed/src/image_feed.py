@@ -26,6 +26,15 @@ class LicensePlate():
 
         tf.keras.backend.clear_session()
 
+        # define dictionaries
+        self.characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        self.int_to_char = dict((i,c) for i,c in enumerate(self.characters))
+        self.parkpos = '12345678'
+        self.int_to_pos = dict((i,c) for i,c in enumerate(self.parkpos))
+
+        # load the model
+        
+
 
         self.bridge = CvBridge()
         self.imageSubscriber = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.findandread)
@@ -43,21 +52,47 @@ class LicensePlate():
         except CvBridgeError as e:
             print(e)
 
-        # Save the image
-        cv2.imwrite('camImg.jpg', camImg)
+        # Save the image DELETE
+        #cv2.imwrite('camImg.jpg', camImg)
 
-        #license_plate = self.getPlate(camImg)
-        #if(license_plate is not None):
+        lic_plate, parkpos = self.seePlate(camImg)
 
-
-        # Get the dimensions
-        h, w, c = camImg.shape
+        if (lic_plate and parkpos is not None):
+            plate, position = self.decipherPlate(self, lic_plate, parkpos)
+            print("plate = {} in P{}".format(plate, position))
 
         return None
 
+    # Make the main running code here
+    def seePlate(camImg):
+        warped = self.getPlate(camImg)
+        # define l_blue and u_blue
+        l_blue = np.array([80, 140, 80])
+        u_blue = np.array([150, 255, 235])
+        if warped is not None:
+            mask_p, blue_p = self.readPlate(warped, l_blue, u_blue) #define blues!
+            #If successfully read license plate, then get parking. Otherwise exit
+            plate_read = self.get_chars(mask_p, mask_p)
+            if plate_read is not None:
+                cropped_plate = get_chars(mask_p, mask_p)
+                # Parking
+                parking_plate = warped
+                l_black = np.array([0, 0, 0])
+                u_black = np.array([180, 255, 30])
+                hsv_b = cv2.cvtColor(parking_plate, cv2.COLOR_BGR2HSV)
+                mask_b = cv2.inRange(hsv_b, l_black, u_black)
+                parking_pos = self.getParking(mask_b, mask_b)
+            else 
+                return None
+        else
+            return None
+
+        return cropped_plate, parking_pos
+
+
+
     # Identify and get the plate 
-    # Main function to get the license plate
-    # Run after running all other cells
+    # Returns warped image (perspective transform)
     def getPlate(self, img):
         h = img.shape[0] #720
         w = img.shape[1] #1280
@@ -115,10 +150,10 @@ class LicensePlate():
 
         contours_to_use = sorted_contours[most_similar_index:most_similar_index+2]
 
-        # check if there is at least one of the largest contours that is more than 2% of the entire image area
+        # check if there is at least one of the largest contours that is more than 1.2% of the entire image area
         largest_contours_area = [cv2.contourArea(c) for c in contours_to_use]
-        if all(area < 0.02 * image_area for area in largest_contours_area):
-            print('Error: None of the largest contours is more than 2% of the entire image area')
+        if all(area < 0.012 * image_area for area in largest_contours_area):
+            print('Error: None of the largest contours is more than 1.2% of the entire image area')
             return None, None
         # get the y-axis positions of the chosen contours
         y_positions = [cv2.boundingRect(c)[1] for c in contours_to_use]
@@ -203,7 +238,7 @@ class LicensePlate():
         return warped
 
 
-    def readPlate(self,warped_img, l_blue, u_blue):
+    def readPlate(self, warped_img, l_blue, u_blue):
         plate = warped_img
         h = plate.shape[0]
         w = plate.shape[1]
@@ -224,6 +259,25 @@ class LicensePlate():
         blue_morph = cv2.morphologyEx(blue_p, cv2.MORPH_CLOSE, kernel) 
 
         return mask_morph, blue_morph
+
+    def resize_image(self, image, new_width, new_height):
+        height = image.shape[0]
+        width = image.shape[1]
+
+        if new_width is None and new_height is None:
+            return image
+
+        if new_width is None:
+            aspect_ratio = new_height / float(height)
+            new_width = int(width * aspect_ratio)
+        elif new_height is None:
+            aspect_ratio = new_width / float(width)
+            new_height = int(height * aspect_ratio)
+
+        resized_img = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        resized_img = cv2.medianBlur(resized_img, 5)
+
+        return resized_img
         
     # Params: masked image and original image (blue image)
     # Returns the 4 cropped images of each character
@@ -254,22 +308,21 @@ class LicensePlate():
         if abs(widths[0] - widths[1]) > 20:
             print('Error: Chars do not have similar width')
             return None
-        
-            # check if the area of one of the largest contours is less than 0.05% of the entire image area
+
+        # exit if any contour has an area less than 28% of any of the other contours
+        for i, c1 in enumerate(largest_contours):
+            for c2 in largest_contours[i+1:]:
+                area_ratio = cv2.contourArea(c1) / cv2.contourArea(c2)
+                if area_ratio < 0.28 or area_ratio > 28:
+                    print('Error: Contour area ratio is less than 28%')
+                    return None, None
+                
+        # check if the area of one of the largest contours is less than 0.05% of the entire image area
         for c in largest_contours:
             contour_area = cv2.contourArea(c)
             if contour_area < 0.0005 * image_area:
                 print('Error: Area of one of letter is less than 0.05% of the entire image area')
                 return None
-
-        # Added this latest          
-        # exit if any contour has an area less than 20% of any of the other contours
-        for i, c1 in enumerate(largest_contours):
-            for c2 in largest_contours[i+1:]:
-                area_ratio = cv2.contourArea(c1) / cv2.contourArea(c2)
-                if area_ratio < 0.2 or area_ratio > 20:
-                    print('Error: Contour area ratio is less than 20%')
-                    return None, None
 
         corners = []
         x_coords = []
@@ -297,7 +350,7 @@ class LicensePlate():
                 min_diff = diff
             if diff > max_diff:
                 max_diff = diff
-        print(min_diff, max_diff)
+        #print(min_diff, max_diff)
         
         # Get the left x coordinate
         left_x = []
@@ -391,22 +444,34 @@ class LicensePlate():
         return cropped_imgs[1] 
 
 
-    # Train the CNN
+    # Test CNN
+    # Params: lic_img (license plate image from get_chars) and p_img (pos img from getParking)
+    # Returns the plate and position (string)
+    def decipherPlate(lic_img, p_img):
+    plate = ""
+    pos = ""
+    # Reading the plate
+    for i in range(len(lic_img)):
+        img = lic_img[i]
+        char =  tf.expand_dims(img, axis=0)
+        with self.graph.as_default():
+        try:
+            set_session(self.sess)
+            y_pred = self.conv_model.predict(char)[0]
+            plate = plate + self.int_to_char[np.argmax(y_pred)]
+        except Exception as e:
+            #print("No plate found")
 
-    # One-hot encoding
-    def one_hot_encode(label):
-        integer_labels = {'0': 26, '1': 27, '2': 28, '3': 29, '4': 30, '5': 31, '6': 32, '7': 33, '8': 34, '9': 35,
-                        'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6, 'H': 7, 'I': 8, 'J': 9, 'K': 10,
-                        'L': 11, 'M': 12, 'N': 13, 'O': 14, 'P': 15, 'Q': 16, 'R': 17, 'S': 18, 'T': 19, 'U': 20,
-                        'V': 21, 'W': 22, 'X': 23, 'Y': 24, 'Z': 25}
-                        
-        int_label = integer_labels[label]
-        if int_label is None:
-        raise ValueError(f"Invalid label: {label}")
-        one_hot_label = np.zeros(36)
-        one_hot_label[int_label] = 1
+    # Reading the position
+    pos_num = tf.expand_dims(p_img, axis = 0)
+    with self.graph.as_default():
+        try:
+        set_session(self.sess)
+        pos_pred = self.conv_model.predict(pos_num)[0]
+        pos = self.int_to_pos[np.argmax(pos_pred)]
+            
+    return pos, plate
 
-        return one_hot_label
 
     
 # # Create object; it's wrong -> shouldn't be in a class

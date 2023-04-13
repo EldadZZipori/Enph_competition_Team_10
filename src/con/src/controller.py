@@ -118,7 +118,7 @@ def hill_hard_code():
     twist_msg.angular.z = 0
     twist_msg.linear.x = 0.5
     mov_pub.publish(twist_msg)
-    rospy.sleep(1) # first parking plate
+    rospy.sleep(0.9) # first parking plate
     twist_msg.angular.z = 0
     twist_msg.linear.x = 0
     mov_pub.publish(twist_msg)

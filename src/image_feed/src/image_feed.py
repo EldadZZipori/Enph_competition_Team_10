@@ -18,6 +18,20 @@ from tensorflow.keras import backend
 from tensorflow.python.keras.backend import set_session
 from tensorflow.python.keras.models import load_model
 
+lower_blue_list = [
+    [100, 150, 80], #darker
+    [100, 120, 80], #light
+    [105, 190, 90] #darkest
+]
+
+upper_blue_list = [
+    [120, 255, 210], #darker
+    [120, 240, 210], #light
+    [130, 255, 210] #darkest
+]
+# define l_blue and u_blue for plates
+l_blue = np.array([80, 140, 80])
+u_blue = np.array([150, 255, 235])
 
 class LicensePlate():
 
@@ -63,18 +77,24 @@ class LicensePlate():
 
         return None
 
-    # Make the main running code here
-    def seePlate(camImg):
-        warped = self.getPlate(camImg)
-        # define l_blue and u_blue
-        l_blue = np.array([80, 140, 80])
-        u_blue = np.array([150, 255, 235])
-        if warped is not None:
+    def seePlate(self, camImg):
+        lower_blue = np.array([100, 150, 80])
+        upper_blue = np.array([120, 255, 210])
+        warped = self.getPlate(camImg, lower_blue, upper_blue)
+        if warped is None:
+            lower_blue, upper_blue = self.pickBlue(lower_blue, upper_blue,lower_blue_list, upper_blue_list)
+            warped = self.getPlate(camImg, lower_blue, upper_blue)
+            if warped is None:
+                lower_blue, upper_blue = self.pickBlue(lower_blue, upper_blue,lower_blue_list, upper_blue_list)
+                warped = self.getPlate(camImg, lower_blue, upper_blue)
+            else:
+                return None
+        else:
             mask_p, blue_p = self.readPlate(warped, l_blue, u_blue) #define blues!
             #If successfully read license plate, then get parking. Otherwise exit
             plate_read = self.get_chars(mask_p, mask_p)
             if plate_read is not None:
-                cropped_plate = self.get_chars(mask_p, mask_p)
+                cropped_plate = get_chars(mask_p, mask_p)
                 # Parking
                 parking_plate = warped
                 l_black = np.array([0, 0, 0])
@@ -82,18 +102,30 @@ class LicensePlate():
                 hsv_b = cv2.cvtColor(parking_plate, cv2.COLOR_BGR2HSV)
                 mask_b = cv2.inRange(hsv_b, l_black, u_black)
                 parking_pos = self.getParking(mask_b, mask_b)
-            else 
-                return None
-        else
-            return None
 
         return cropped_plate, parking_pos
+        
+    # returns lower blue and upper blue of a different shade
+    def pickBlue(self, prev_blue_low, prev_blue_up, lower_blue_list, upper_blue_list):
+        new_blue_low = lower_blue_list[1]
+        new_blue_high = upper_blue_list[1]
 
+        if prev_blue_low == lower_blue_list[0]:
+            new_blue_low = lower_blue_list[1]
+            new_blue_high = upper_blue_list[1]
+        if prev_blue_low == lower_blue_list[1]:
+            new_blue_low = lower_blue_list[2]
+            new_blue_high = upper_blue_list[2]
+        if prev_blue_low == lower_blue_list[2]:
+            new_blue_low = lower_blue_list[0]
+            new_blue_high = upper_blue_list[0]
+
+        return new_blue_low, new_blue_high
 
 
     # Identify and get the plate 
     # Returns warped image (perspective transform)
-    def getPlate(self, img):
+    def getPlate(self, img, lower_blue, upper_blue):
         h = img.shape[0] #720
         w = img.shape[1] #1280
 

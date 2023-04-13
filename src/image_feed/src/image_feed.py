@@ -74,7 +74,7 @@ class LicensePlate():
             #If successfully read license plate, then get parking. Otherwise exit
             plate_read = self.get_chars(mask_p, mask_p)
             if plate_read is not None:
-                cropped_plate = get_chars(mask_p, mask_p)
+                cropped_plate = self.get_chars(mask_p, mask_p)
                 # Parking
                 parking_plate = warped
                 l_black = np.array([0, 0, 0])
@@ -105,14 +105,14 @@ class LicensePlate():
         img = img[int(h/4):h-int(h/6), int(w/20):w-int(w/20)]
         mask = mask[int(h/4):h-int(h/6), int(w/20):w-int(w/20)]
         # Get the contours
-        pic, coords = get_corners(mask, img)
+        pic, coords = self.get_corners(mask, img)
         print(coords)
 
         if coords is None:
             return None
         else:
             # Perspective transform
-            warped = transform(img, coords)
+            warped = self.transform(img, coords)
 
         return warped
 
@@ -146,8 +146,8 @@ class LicensePlate():
         if most_similar_index is None:
             print('Error: Could not find 2 largest contours with similar height')
             return None, None
-        # take the 2 contours with the most similar height
 
+        # take the 2 contours with the most similar height
         contours_to_use = sorted_contours[most_similar_index:most_similar_index+2]
 
         # check if there is at least one of the largest contours that is more than 1.2% of the entire image area
@@ -201,7 +201,7 @@ class LicensePlate():
             corners.append((tl, tr, br, bl))
 
         print(corners)
-        coords = get_left_right_rectangles(corners)
+        coords = self.get_left_right_rectangles(corners)
 
         return img, coords
 
@@ -248,9 +248,6 @@ class LicensePlate():
 
         mask_p = cv2.inRange(hsv_plate, l_blue, u_blue) #binary
 
-        # optional (dilation to thicken the chars)
-        #d ilation = cv2.dilate(mask_p,kernel,iterations = 1)
-
         # Apply the mask to the original image to extract the blue part
         blue_p = cv2.bitwise_and(plate, plate, mask = mask_p) #colour
 
@@ -266,13 +263,6 @@ class LicensePlate():
 
         if new_width is None and new_height is None:
             return image
-
-        if new_width is None:
-            aspect_ratio = new_height / float(height)
-            new_width = int(width * aspect_ratio)
-        elif new_height is None:
-            aspect_ratio = new_width / float(width)
-            new_height = int(height * aspect_ratio)
 
         resized_img = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
         resized_img = cv2.medianBlur(resized_img, 5)
@@ -350,7 +340,6 @@ class LicensePlate():
                 min_diff = diff
             if diff > max_diff:
                 max_diff = diff
-        #print(min_diff, max_diff)
         
         # Get the left x coordinate
         left_x = []
@@ -370,9 +359,14 @@ class LicensePlate():
             cropped_img = ori[lowest_y:lowest_y+max_height, x:x+max_diff]
             cropped_imgs.append(cropped_img)
 
+        if len(cropped_imgs) !=4:
+            print('Error: Did not get 4 characters')
+            return None
+        
         if cropped_imgs is not None:
+            # Resize the image to (128,128)
             for i in range(len(cropped_imgs)):
-            cv2_imshow(cropped_imgs[i])
+                cropped_imgs[i] = self.resize_image(cropped_imgs[i] , 128, 128)
         else:
             print('Error: Could not find characters')
             return None
@@ -395,7 +389,7 @@ class LicensePlate():
         heights = [cv2.boundingRect(c)[3] for c in largest_contours]
         if abs(heights[0] - heights[1]) > 20:
             print('Error: Parking position do not have similar height; are not characters')
-            return None, None
+            return None
 
         corners = []
         x_coords = []
@@ -441,6 +435,13 @@ class LicensePlate():
             cropped_img = ori[lowest_y:lowest_y+max_height, x:x+max_diff]
             cropped_imgs.append(cropped_img)
 
+        # Resize the image
+        if cropped_imgs is not None:
+            cropped_imgs[i] = self.resize_image(cropped_imgs[1] , 128, 128)
+        else:
+            print('Error: Could not find characters')
+            return None
+
         return cropped_imgs[1] 
 
 
@@ -448,29 +449,29 @@ class LicensePlate():
     # Params: lic_img (license plate image from get_chars) and p_img (pos img from getParking)
     # Returns the plate and position (string)
     def decipherPlate(lic_img, p_img):
-    plate = ""
-    pos = ""
-    # Reading the plate
-    for i in range(len(lic_img)):
-        img = lic_img[i]
-        char =  tf.expand_dims(img, axis=0)
-        with self.graph.as_default():
-        try:
-            set_session(self.sess)
-            y_pred = self.conv_model.predict(char)[0]
-            plate = plate + self.int_to_char[np.argmax(y_pred)]
-        except Exception as e:
-            #print("No plate found")
+        plate = ""
+        pos = ""
+        # Reading the plate
+        for i in range(len(lic_img)):
+            img = lic_img[i]
+            char =  tf.expand_dims(img, axis=0)
+            with self.graph.as_default():
+            try:
+                set_session(self.sess)
+                y_pred = self.conv_model.predict(char)[0]
+                plate = plate + self.int_to_char[np.argmax(y_pred)]
+            except Exception as e:
+                #print("No plate found")
 
-    # Reading the position
-    pos_num = tf.expand_dims(p_img, axis = 0)
-    with self.graph.as_default():
-        try:
-        set_session(self.sess)
-        pos_pred = self.conv_model.predict(pos_num)[0]
-        pos = self.int_to_pos[np.argmax(pos_pred)]
-            
-    return pos, plate
+        # Reading the position
+        pos_num = tf.expand_dims(p_img, axis = 0)
+        with self.graph.as_default():
+            try:
+            set_session(self.sess)
+            pos_pred = self.conv_model.predict(pos_num)[0]
+            pos = self.int_to_pos[np.argmax(pos_pred)]
+                
+        return pos, plate
 
 
     
@@ -481,7 +482,14 @@ class LicensePlate():
 
 # cv.destroyAllWindows()
 
+def main():
+    rospy.init_node("image_feed")
 
-# Create the object
-licensePlates = LicensePlate()
-rospy.spin() #has infinite loop
+    # Create the object
+    licensePlates = LicensePlate()
+    rate = rospy.Rate(10)
+    while not rospy.is_shutdown():
+        rate.sleep()
+    #rospy.spin() #has infinite loop
+if __name__ == '__main__':
+    main()

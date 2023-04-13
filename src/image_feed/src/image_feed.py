@@ -4,7 +4,7 @@ import rospy
 import cv2 as cv
 import numpy as np 
 from sensor_msgs.msg import Image
-from std_mesgs.msg import String
+from std_msgs.msg import String
 from cv_bridge import CvBridge, CvBridgeError
 
 import tensorflow as tf
@@ -51,7 +51,7 @@ class LicensePlate():
 
 
         self.bridge = CvBridge()
-        self.imageSubscriber = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.findandread)
+        self.imageSubscriber = rospy.Subscriber("/R1/pi_camera/image_raw", Image, self.callback)
         self.ReadPublisher = rospy.Publisher('/license_plate', String, queue_size = 10)
         self.ReadRate = rospy.Rate(10)
         self.prevError = 0
@@ -244,11 +244,11 @@ class LicensePlate():
         print(rec1[0][0], 'and',rec2[0][0])
         # Check which is left or right rectangle through comparing the x coord of tl
         if rec1[0][0] < rec2[0][0]:
-        left_rec = rec1
-        right_rec = rec2
+            left_rec = rec1
+            right_rec = rec2
         else:
-        left_rec = rec2
-        right_rec = rec1
+            left_rec = rec2
+            right_rec = rec1
 
         left_tr = left_rec[1] #tl
         left_br = left_rec[2] #bl
@@ -488,20 +488,22 @@ class LicensePlate():
             img = lic_img[i]
             char =  tf.expand_dims(img, axis=0)
             with self.graph.as_default():
-            try:
-                set_session(self.sess)
-                y_pred = self.conv_model.predict(char)[0]
-                plate = plate + self.int_to_char[np.argmax(y_pred)]
-            except Exception as e:
-                #print("No plate found")
+                try:
+                    set_session(self.sess)
+                    y_pred = self.conv_model.predict(char)[0]
+                    plate = plate + self.int_to_char[np.argmax(y_pred)]
+                except Exception as e:
+                    print(e)
 
         # Reading the position
         pos_num = tf.expand_dims(p_img, axis = 0)
         with self.graph.as_default():
             try:
-            set_session(self.sess)
-            pos_pred = self.conv_model.predict(pos_num)[0]
-            pos = self.int_to_pos[np.argmax(pos_pred)]
+                set_session(self.sess)
+                pos_pred = self.conv_model.predict(pos_num)[0]
+                pos = self.int_to_pos[np.argmax(pos_pred)]
+            except Exception as e:
+                print(e)
                 
         return pos, plate
 

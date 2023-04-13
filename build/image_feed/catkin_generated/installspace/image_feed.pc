@@ -1,0 +1,8 @@
+prefix=/home/fizzer/ros_ws/install
+
+Name: image_feed
+Description: Description of image_feed
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

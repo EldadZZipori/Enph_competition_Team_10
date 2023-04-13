@@ -1,0 +1,8 @@
+<launch>
+   <!-- My Package launch file -->
+   <node pkg="image_feed"
+         type="image_feed.py"
+         name="image_feed" 
+         output="screen">
+   </node>
+</launch>

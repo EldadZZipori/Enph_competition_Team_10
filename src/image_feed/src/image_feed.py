@@ -8,14 +8,11 @@ from std_msgs.msg import String
 from cv_bridge import CvBridge, CvBridgeError
 
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
 
 from tensorflow.keras import layers
 from tensorflow.keras import models
 from tensorflow.keras import optimizers
 from tensorflow.keras.utils import plot_model
-from tensorflow.keras import backend
-from tensorflow.python.keras.backend import set_session
 from tensorflow.python.keras.models import load_model
 
 TEAM_NAME = "Team11"
@@ -41,18 +38,14 @@ class LicensePlate():
     #initiate the object
     def __init__(self):
 
-        tf.keras.backend.clear_session()
-
         # define dictionaries
         self.characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         self.int_to_char = dict((i,c) for i,c in enumerate(self.characters))
-        self.parkpos = '12345678'
-        self.int_to_pos = dict((i,c) for i,c in enumerate(self.parkpos))
+        # self.parkpos = '12345678'
+        # self.int_to_pos = dict((i,c) for i,c in enumerate(self.parkpos))
 
         # load the model
-        #self.sess = tf.keras.backend.get_session()
         self.conv_model = models.load_model("/home/fizzer/ros_ws/src/image_feed/model_v2")
-        self.conv_model.make_predict_function()
 
 
         self.bridge = CvBridge()
@@ -60,14 +53,12 @@ class LicensePlate():
         self.ReadPublisher = rospy.Publisher('/license_plate', String, queue_size = 10)
         self.ReadRate = rospy.Rate(10)
         self.prevError = 0
-
-        #CNN
         
 
     # Read image
     def callback(self, data):
         try: 
-            camImg = bridge.imgmsg_to_cv2(data, "bgr8")
+            camImg = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
 
@@ -475,7 +466,7 @@ class LicensePlate():
 
         # Resize the image
         if cropped_imgs is not None:
-            cropped_imgs[i] = self.resize_image(cropped_imgs[1] , 128, 128)
+            cropped_imgs[1] = self.resize_image(cropped_imgs[1] , 128, 128)
         else:
             print('Error: Could not find characters')
             return None
@@ -493,40 +484,23 @@ class LicensePlate():
         for i in range(len(lic_img)):
             img = lic_img[i]
             char =  tf.expand_dims(img, axis=0)
-            with self.graph.as_default():
-                try:
-                    set_session(self.sess)
-                    y_pred = self.conv_model.predict(char)[0]
-                    plate = plate + self.int_to_char[np.argmax(y_pred)]
-                except Exception as e:
-                    print(e)
+            y_pred = self.conv_model.predict(char)[0]
+            plate = plate + self.int_to_char[np.argmax(y_pred)]
 
         # Reading the position
         pos_num = tf.expand_dims(p_img, axis = 0)
-        with self.graph.as_default():
-            try:
-                set_session(self.sess)
-                pos_pred = self.conv_model.predict(pos_num)[0]
-                pos = self.int_to_pos[np.argmax(pos_pred)]
-            except Exception as e:
-                print(e)
-                
+        pos_pred  = self.conv_model.predict(pos_num)[0]
+        pos = self.int_to_pos[np.argmax(pos_pred)]
+            
         return pos, plate
 
 
-    
-# # Create object; it's wrong -> shouldn't be in a class
-# bridge = Cv.Bridge()
-# image_sub = rospy.Subscriber("/R1/pi_camera/image_raw", Image, callback) #subscribe calls the callback func like an interrupt
-# #license_pub = rospy.Publisher("license_plate", String, queue_size=10)
-
-# cv.destroyAllWindows()
 
 def main():
     rospy.init_node("image_feed")
 
     # Create the object
-    licensePlates = LicensePlate()
+    licensePlate = LicensePlate()
     rate = rospy.Rate(10)
     while not rospy.is_shutdown():
         rate.sleep()
